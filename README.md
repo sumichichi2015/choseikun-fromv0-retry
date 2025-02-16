@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 会議調整くん
 
-## Getting Started
+会議調整くんは、複数の参加者の予定を効率的に調整するためのWebアプリケーションです。
+直感的なUIで、会議の日時調整を簡単に行うことができます。
 
-First, run the development server:
+## 主な機能
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. 会議の作成（主催者向け）
+2. 参加可否の回答（参加者向け）
+3. 回答状況の可視化
+4. コメント機能
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 使い方
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. 会議を作成する（主催者）
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. トップページにアクセスし、「新しい会議を作成」をクリックします
+2. 会議のタイトルと説明を入力します
+3. カレンダーから候補日を選択します
+   - 日付をクリックして選択
+   - 選択した日付の時間枠が表示されます
+4. 時間枠を選択します
+   - 30分単位で選択可能
+   - 複数の時間枠を選択できます
+5. 「作成」ボタンをクリックします
+6. 生成されたURLを参加者に共有します
 
-## Learn More
+### 2. 参加可否を回答する（参加者）
 
-To learn more about Next.js, take a look at the following resources:
+1. 共有されたURLにアクセスします
+2. 以下の情報を入力します：
+   - お名前（6文字以内）
+   - コメント（任意、40文字以内）
+3. 各時間枠に対して参加可否を選択します：
+   - ○：参加可能
+   - △：調整可能
+   - ×：参加不可
+4. 回答方法：
+   - 個別クリック：各時間枠を個別に選択
+   - ドラッグ選択：マウスドラッグで連続した時間枠を一括選択
+5. 「回答を送信」をクリックして完了です
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. 回答状況の確認
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+回答状況は色分けで視覚的に表示されます：
 
-## Deploy on Vercel
+- 普通の青：全員が「○」
+- 薄い青：「○」と「△」のみ（×なし）
+- 薄いオレンジ：「×」があるが、参加可能性が高い
+- 薄いピンク：「×」が多く、参加可能性が低い
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. その他の機能
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 参加者一覧：
+  - 回答した順に右から左へ表示されます
+  - 各参加者の回答とコメントを確認できます
+
+- コメント機能：
+  - 参加者は回答時にコメントを残せます（40文字以内）
+  - 時間の制約や希望を伝えるのに便利です
+
+## 注意事項
+
+- ブラウザのJavaScriptを有効にしてご利用ください
+- 推奨ブラウザ：
+  - Google Chrome（最新版）
+  - Mozilla Firefox（最新版）
+  - Microsoft Edge（最新版）
+  - Safari（最新版）
+
+## お問い合わせ
+
+不具合や改善要望がございましたら、GitHubのIssuesにてご報告ください。
