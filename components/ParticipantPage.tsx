@@ -41,6 +41,11 @@ interface Participant {
   name: string
   comment?: string
   responses: ParticipantResponse[]
+  created_at: string
+}
+
+interface Response {
+  response: "○" | "△" | "×"
 }
 
 const initialMeetingData: MeetingData = {
@@ -53,38 +58,28 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
   const [meetingData, setMeetingData] = useState<MeetingData>(initialMeetingData)
   const [name, setName] = useState("")
   const [comment, setComment] = useState("")
-  const [responses, setResponses] = useState<Record<string, "OK" | "MAYBE" | "NG">>({})
+  const [responses, setResponses] = useState<{ [key: string]: "OK" | "MAYBE" | "NG" | null }>({})
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [participantResponses, setParticipantResponses] = useState<Record<string, Record<string, number>>>({})
+  const [isMouseDown, setIsMouseDown] = useState(false)
+  const [currentResponse, setCurrentResponse] = useState<"OK" | "MAYBE" | "NG" | null>(null)
 
-  // 時間枠の色を計算する関数をメモ化
-  const calculateTimeSlotColor = useCallback((timeSlot: string, participants: Participant[], responses: Record<string, Record<string, number>>) => {
-    if (!participants.length) return "bg-white border-2 border-gray-200"
-
-    const slotResponses = participants.map(p => responses[p.id]?.[timeSlot] || 0)
-    const total = slotResponses.reduce((sum, r) => sum + r, 0)
-    const average = total / participants.length
-
-    if (average >= 2.5) return "bg-blue-400 border-2 border-blue-600"      // 濃い青（参加可能が多い）
-    if (average >= 1.5) return "bg-blue-100 border-2 border-blue-300"      // 薄い青（やや参加可能）
-    if (average >= 0.5) return "bg-orange-100 border-2 border-orange-300"  // 薄オレンジ（やや難しい）
-    return "bg-pink-100 border-2 border-pink-300"                          // 薄ピンク（参加困難）
-  }, [])
-
-  // コメント文字数制限を追加
-  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newComment = e.target.value
-    if (newComment.length <= 40) {
-      setComment(newComment)
-    }
+  // 日付フォーマット用のユーティリティ関数
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short"
+    }).replace(/\//g, "/")
   }
 
   // ソートされた時間枠をメモ化
   const sortedTimeRanges = useMemo(() => {
     if (!meetingData?.timeRanges) return []
-    
+
     // 重複を除去して並び替え（クライアント側での重複除去）
     const uniqueRanges = Array.from(new Map(
       meetingData.timeRanges.map(range => [
@@ -98,14 +93,77 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
     })
   }, [meetingData?.timeRanges])
 
-  // 時間枠の色をメモ化
-  const timeSlotColors = useMemo(() => {
-    const colors: Record<string, string> = {}
-    sortedTimeRanges.forEach(range => {
-      colors[range.key] = calculateTimeSlotColor(range.key, participants, participantResponses)
-    })
-    return colors
-  }, [sortedTimeRanges, participants, participantResponses, calculateTimeSlotColor])
+  // 参加者を日時でソート（最も古い回答が最右列）
+  const sortedParticipants = useMemo(() => {
+    return [...participants].sort((a, b) => {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    }).reverse()  // 古い順に右から左へ並べるために反転
+  }, [participants])
+
+  // セルの色を計算する関数
+  const calculateCellColor = useCallback((timeRangeKey: string) => {
+    // その時間枠における全参加者の回答を取得
+    const responses = sortedParticipants.map(participant => 
+      participantResponses[participant.id]?.[timeRangeKey]
+    ).filter(response => response !== undefined)
+
+    if (!responses || responses.length === 0) return ""
+
+    const totalResponses = responses.length
+    const circleCount = responses.filter(r => r === 3).length
+    const triangleCount = responses.filter(r => r === 1).length
+    const xCount = responses.filter(r => r === 0).length
+
+    // 全員が○の場合
+    if (circleCount === totalResponses) {
+      return "bg-blue-400"
+    }
+
+    // ○と△のみの場合（×がない）
+    if (xCount === 0 && circleCount + triangleCount === totalResponses) {
+      return "bg-blue-100"
+    }
+
+    // 参加可能性スコアの計算（○=3点、△=1点、×=0点）
+    const totalScore = (circleCount * 3 + triangleCount * 1)
+    const maxPossibleScore = totalResponses * 3
+    const participationRatio = totalScore / maxPossibleScore
+
+    // 参加可能性が70%を超える場合
+    if (participationRatio > 0.7) {
+      return "bg-orange-100"
+    }
+
+    // それ以外の場合（参加可能性が低い）
+    return "bg-pink-100"
+  }, [sortedParticipants, participantResponses])
+
+  // コメント文字数制限を追加
+  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newComment = e.target.value
+    if (newComment.length <= 40) {
+      setComment(newComment)
+    }
+  }
+
+  // マウスダウン時の処理
+  const handleMouseDown = (response: "OK" | "MAYBE" | "NG") => {
+    setIsMouseDown(true)
+    setCurrentResponse(response)
+  }
+
+  // マウスアップ時の処理
+  const handleMouseUp = () => {
+    setIsMouseDown(false)
+    setCurrentResponse(null)
+  }
+
+  // マウス移動時の処理
+  const handleMouseEnter = (timeRangeKey: string) => {
+    if (isMouseDown && currentResponse) {
+      setResponses(prev => ({ ...prev, [timeRangeKey]: currentResponse }))
+    }
+  }
 
   useEffect(() => {
     const fetchMeetingData = async () => {
@@ -136,6 +194,7 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
             id,
             name,
             comment,
+            created_at,
             responses (
               time_slot_id,
               availability
@@ -220,6 +279,14 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
     fetchMeetingData()
   }, [meetingId])
 
+  useEffect(() => {
+    // マウスアップイベントをグローバルに設定
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
   const handleSubmit = async () => {
     if (!name) {
       toast.error("名前は必須です。")
@@ -279,7 +346,7 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
         .insert(responseData)
 
       if (responsesError) throw responsesError
-      
+
       // 新しい参加者の回答を整理
       const newParticipantResponses = Object.entries(responses).reduce((acc, [timeRange, availability]) => {
         const slot = timeSlots.find(s => {
@@ -306,8 +373,8 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
 
       // 状態を更新
       setParticipants(prev => [
-        { 
-          ...participant, 
+        {
+          ...participant,
           responses: Object.entries(newParticipantResponses).map(([_, availability]) => ({
             time_slot_id: participant.id,
             availability
@@ -337,100 +404,121 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className="max-w-4xl mx-auto p-2">
       <h1 className="text-2xl font-bold mb-6">{meetingData.title}</h1>
       {meetingData.description && (
         <p className="text-gray-600 mb-6">説明: {meetingData.description}</p>
       )}
 
       <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">参加者登録</h2>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                お名前
-              </label>
-              <Input
-                id="name"
-                name="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="山田 太郎"
-                required
-                autoComplete="name"
-              />
-            </div>
-            <div>
-              <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1">
-                コメント
-              </label>
-              <div className="relative">
-                <Textarea
-                  id="comment"
-                  name="comment"
-                  value={comment}
-                  onChange={handleCommentChange}
-                  placeholder="備考や要望があればご記入ください（40文字以内）"
-                  className={`h-20 ${comment.length >= 40 ? 'border-red-500 focus:border-red-500' : ''}`}
-                  maxLength={40}
+
+        {/* 参加者登録フォーム */}
+        <div className="mt-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-xl font-semibold mb-4">参加者登録</h2>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  お名前
+                </label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value.slice(0, 6))}
+                  placeholder="山田 太郎"
+                  required
+                  autoComplete="name"
+                  maxLength={6}
                 />
-                <div className={`absolute bottom-2 right-2 text-sm ${
-                  comment.length >= 40 ? 'text-red-500 font-bold' : 'text-gray-500'
-                }`}>
-                  {comment.length}/40
+              </div>
+              <div>
+                <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1">
+                  コメント
+                </label>
+                <div className="relative">
+                  <Textarea
+                    id="comment"
+                    name="comment"
+                    value={comment}
+                    onChange={handleCommentChange}
+                    placeholder="備考や要望があればご記入ください（40文字以内）"
+                    className={`h-20 ${comment.length >= 40 ? 'border-red-500 focus:border-red-500' : ''}`}
+                    maxLength={40}
+                  />
+                  <div className={`absolute bottom-2 right-2 text-sm ${
+                    comment.length >= 40 ? 'text-red-500 font-bold' : 'text-gray-500'
+                  }`}>
+                    {comment.length}/40
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
+        {/* テーブル */}
         <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
+          <table className="min-w-full border-collapse">
+            <thead>
+              <tr className="border-b-2 border-gray-300">
+                <th scope="col" className="px-4 py-2 text-left text-sm font-medium text-gray-500 sticky left-0 bg-white border-r border-gray-300">
                   日時
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  新規回答
+                <th className="text-center border-b border-r border-gray-300 bg-gray-50">
+                  <div>あなたの回答↓</div>
+                  <div className="text-xs text-gray-500">※ドラッグで複数選択可</div>
                 </th>
-                {participants.map((participant) => (
-                  <th key={participant.id} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {sortedParticipants.map((participant) => (
+                  <th key={participant.id} scope="col" className="px-4 py-2 text-center text-sm font-medium text-gray-500 border-r border-gray-300">
                     <div className="font-medium">{participant.name}</div>
-                    {participant.comment && (
-                      <div className="text-gray-400 text-xs normal-case mt-1">{participant.comment}</div>
-                    )}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {sortedTimeRanges.map((timeRange, index) => {
                 const [currentDate] = timeRange.key.split(" ")
-                const [prevDate] = index > 0 ? sortedTimeRanges[index - 1].key.split(" ") : [currentDate]
+                const [prevDate] = index > 0 ? sortedTimeRanges[index - 1].key.split(" ") : [""]
                 const isNewDay = currentDate !== prevDate
 
+                const participantResponsesForTimeRange = sortedParticipants
+                  .map(participant => participantResponses[participant.id]?.[timeRange.key])
+                  .filter(response => response !== undefined)
+
+                const cellColor = calculateCellColor(timeRange.key)
+
                 return (
-                  <tr 
-                    key={timeRange.id}  // スロットのIDを使用して一意性を確保
-                    className={`
-                      ${timeSlotColors[timeRange.key]} 
-                      transition-colors duration-200 
-                      ${isNewDay ? 'border-t-8 border-gray-200' : ''}
-                    `}
+                  <tr
+                    key={timeRange.key}
+                    className={`${isNewDay ? "border-t-2 border-gray-300" : ""} ${cellColor}`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-inherit">
-                      {`${currentDate} ${timeRange.displayTime}`}
+                    <td className={`px-4 py-2 text-sm whitespace-nowrap sticky left-0 bg-white border-r border-gray-300 ${isNewDay ? 'border-t-2 border-t-gray-400' : ''}`}>
+                      {isNewDay && (
+                        <div className="font-medium">
+                          {new Date(currentDate).toLocaleDateString("ja-JP", {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            weekday: "short"
+                          }).replace(/\//g, "/")}
+                        </div>
+                      )}
+                      <div>{timeRange.displayTime}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex space-x-2">
+                    <td className={`px-4 py-2 whitespace-nowrap border-r border-gray-300`}>
+                      <div className="flex space-x-1 justify-center">
                         <Button
                           style={{ fontSize: "1.5rem" }}
                           size="sm"
                           variant={responses[timeRange.key] === "OK" ? "default" : "outline"}
                           onClick={() => setResponses(prev => ({ ...prev, [timeRange.key]: "OK" }))}
-                          className="w-10 h-10 text-lg font-bold rounded-full shadow-md hover:scale-105 transition-all flex items-center justify-center"
+                          onMouseDown={(e) => {
+                            handleMouseDown("OK")
+                            setResponses(prev => ({ ...prev, [timeRange.key]: "OK" }))
+                          }}
+                          onMouseEnter={() => handleMouseEnter(timeRange.key)}
+                          className="w-8 h-8 text-sm font-bold rounded-full shadow-sm hover:scale-105 transition-all flex items-center justify-center"
                         >
                           ◯
                         </Button>
@@ -439,7 +527,12 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
                           size="sm"
                           variant={responses[timeRange.key] === "MAYBE" ? "default" : "outline"}
                           onClick={() => setResponses(prev => ({ ...prev, [timeRange.key]: "MAYBE" }))}
-                          className="w-10 h-10 text-lg font-bold rounded-full shadow-md hover:scale-105 transition-all flex items-center justify-center"
+                          onMouseDown={(e) => {
+                            handleMouseDown("MAYBE")
+                            setResponses(prev => ({ ...prev, [timeRange.key]: "MAYBE" }))
+                          }}
+                          onMouseEnter={() => handleMouseEnter(timeRange.key)}
+                          className="w-8 h-8 text-sm font-bold rounded-full shadow-sm hover:scale-105 transition-all flex items-center justify-center"
                         >
                           △
                         </Button>
@@ -448,17 +541,24 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
                           size="sm"
                           variant={responses[timeRange.key] === "NG" ? "default" : "outline"}
                           onClick={() => setResponses(prev => ({ ...prev, [timeRange.key]: "NG" }))}
-                          className="w-10 h-10 text-lg font-bold rounded-full shadow-md hover:scale-105 transition-all flex items-center justify-center"
+                          onMouseDown={(e) => {
+                            handleMouseDown("NG")
+                            setResponses(prev => ({ ...prev, [timeRange.key]: "NG" }))
+                          }}
+                          onMouseEnter={() => handleMouseEnter(timeRange.key)}
+                          className="w-8 h-8 text-sm font-bold rounded-full shadow-sm hover:scale-105 transition-all flex items-center justify-center"
                         >
                           ✕
                         </Button>
                       </div>
                     </td>
-                    {participants.map((participant) => (
-                      <td key={participant.id} className="px-6 py-4 whitespace-nowrap text-center">
-                        {participantResponses[participant.id]?.[timeRange.key] === 3 && "○"}
-                        {participantResponses[participant.id]?.[timeRange.key] === 1 && "△"}
-                        {participantResponses[participant.id]?.[timeRange.key] === 0 && "✕"}
+                    {sortedParticipants.map((participant) => (
+                      <td key={participant.id} className={`px-4 py-2 text-center text-sm whitespace-nowrap border-r border-gray-300`}>
+                        <span style={{ fontSize: "1.5rem" }}>
+                          {participantResponses[participant.id]?.[timeRange.key] === 3 && "◯"}
+                          {participantResponses[participant.id]?.[timeRange.key] === 1 && "△"}
+                          {participantResponses[participant.id]?.[timeRange.key] === 0 && "✕"}
+                        </span>
                       </td>
                     ))}
                   </tr>
@@ -468,7 +568,24 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
           </table>
         </div>
 
-        <div className="flex justify-end">
+        {/* コメント一覧 */}
+        {participants.length > 0 && (
+          <div className="mt-4 bg-white rounded-lg shadow p-4">
+            <h3 className="text-lg font-semibold mb-2">参加者コメント</h3>
+            <ul className="space-y-2">
+              {sortedParticipants.map((participant) => (
+                participant.comment && (
+                  <li key={participant.id} className="text-sm">
+                    <span className="font-medium">{participant.name}:</span> {participant.comment}
+                  </li>
+                )
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 送信ボタン */}
+        <div className="flex justify-end mt-4">
           <Button
             onClick={handleSubmit}
             disabled={!name}
