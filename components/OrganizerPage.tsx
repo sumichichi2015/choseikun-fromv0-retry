@@ -53,7 +53,7 @@ export default function OrganizerPage() {
         const baseHour = parseInt(startHour)
         
         // 各時間に対して0分と30分の枠を作成
-        for (let minutes of [0, 30]) {
+        for (const minutes of [0, 30]) {
           // 日本時間で日付オブジェクトを作成
           const startDate = new Date(
             parseInt(year),
