@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/lib/toast"
+import { useRouter } from 'next/navigation';
 
 interface ParticipantPageProps {
   meetingId: string
@@ -116,12 +117,12 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
 
     // 全員が○の場合
     if (circleCount === totalResponses) {
-      return "bg-blue-400"
+      return "bg-blue-100"
     }
 
     // ○と△のみの場合（×がない）
     if (xCount === 0 && circleCount + triangleCount === totalResponses) {
-      return "bg-blue-100"
+      return "bg-lime-100"
     }
 
     // 参加可能性スコアの計算（○=3点、△=1点、×=0点）
@@ -131,11 +132,11 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
 
     // 参加可能性が70%を超える場合
     if (participationRatio > 0.7) {
-      return "bg-orange-100"
+      return "bg-pink-100"
     }
 
     // それ以外の場合（参加可能性が低い）
-    return "bg-pink-100"
+    return "bg-pink-300"
   }, [sortedParticipants, participantResponses])
 
   // コメント文字数制限を追加
@@ -404,12 +405,49 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-2">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">{meetingData.title}</h1>
       {meetingData.description && (
         <p className="text-gray-600 mb-6">説明: {meetingData.description}</p>
       )}
-
+      <div className="flex justify-end">
+        <div className="bg-gray-100 rounded-md p-2 text-sm">
+          参加者ページURL：
+          <a
+            href={`${window.location.origin}/participant/${meetingId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-blue-500"
+          >
+            {`${window.location.origin}/participant/${meetingId}`}
+          </a>
+          <Button
+            variant="outline"
+            size="icon"
+            className="ml-2"
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/participant/${meetingId}`)
+              toast.success("URLをコピーしました")
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="lucide lucide-copy"
+            >
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2" />
+            </svg>
+          </Button>
+        </div>
+      </div>
       <div className="space-y-6">
 
         {/* 参加者登録フォーム */}
@@ -466,7 +504,7 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
                   日時
                 </th>
                 <th className="text-center border-b border-r border-gray-300 bg-gray-50">
-                  <div>あなたの回答↓</div>
+                  <div>新たに回答する↓</div>
                   <div className="text-xs text-gray-500">※ドラッグで複数選択可</div>
                 </th>
                 {sortedParticipants.map((participant) => (
@@ -594,6 +632,11 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
             回答を送信
           </Button>
         </div>
+      </div>
+      <div className="text-center mt-4">
+        <Button variant="link" onClick={() => router.push("/")}>
+          新たに会議日時調整をする
+        </Button>
       </div>
     </div>
   )
