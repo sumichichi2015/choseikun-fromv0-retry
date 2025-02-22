@@ -130,7 +130,7 @@ export default function OrganizerPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">会議調整アプリ</h1>
+      <h1 className="text-2xl font-bold mb-6">会議日調整するやつ</h1>
       <div className="space-y-4">
         <div>
           <label htmlFor="meeting-title" className="block text-sm font-medium mb-1">

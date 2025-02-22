@@ -56,6 +56,7 @@ const initialMeetingData: MeetingData = {
 }
 
 export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
+  const router = useRouter();
   const [meetingData, setMeetingData] = useState<MeetingData>(initialMeetingData)
   const [name, setName] = useState("")
   const [comment, setComment] = useState("")
@@ -406,48 +407,22 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">{meetingData.title}</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">{meetingData.title}</h1>
+        <Button
+          variant="link"
+          onClick={() => {
+            navigator.clipboard.writeText(window.location.href);
+            toast.success("参加者URLをコピーしました！");
+          }}
+          className="text-sm"
+        >
+          参加者ページURLをコピー
+        </Button>
+      </div>
       {meetingData.description && (
         <p className="text-gray-600 mb-6">説明: {meetingData.description}</p>
       )}
-      <div className="flex justify-end">
-        <div className="bg-gray-100 rounded-md p-2 text-sm">
-          参加者ページURL：
-          <a
-            href={`${window.location.origin}/participant/${meetingId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline text-blue-500"
-          >
-            {`${window.location.origin}/participant/${meetingId}`}
-          </a>
-          <Button
-            variant="outline"
-            size="icon"
-            className="ml-2"
-            onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/participant/${meetingId}`)
-              toast.success("URLをコピーしました")
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="lucide lucide-copy"
-            >
-              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2" />
-            </svg>
-          </Button>
-        </div>
-      </div>
       <div className="space-y-6">
 
         {/* 参加者登録フォーム */}
@@ -505,7 +480,7 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
                 </th>
                 <th className="text-center border-b border-r border-gray-300 bg-gray-50">
                   <div>新たに回答する↓</div>
-                  <div className="text-xs text-gray-500">※ドラッグで複数選択可</div>
+                  <div className="text-[10px] text-gray-500 leading-tight">※初期状態は全て◯。ドラッグで複数変更可</div>
                 </th>
                 {sortedParticipants.map((participant) => (
                   <th key={participant.id} scope="col" className="px-4 py-2 text-center text-sm font-medium text-gray-500 border-r border-gray-300">
@@ -635,7 +610,7 @@ export default function ParticipantPage({ meetingId }: ParticipantPageProps) {
       </div>
       <div className="text-center mt-4">
         <Button variant="link" onClick={() => router.push("/")}>
-          新たに会議日時調整をする
+          新たに会議日調整をする 「会議日調整するやつ」TOPへ
         </Button>
       </div>
     </div>
